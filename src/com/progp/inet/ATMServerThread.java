@@ -34,6 +34,8 @@ public class ATMServerThread extends Thread {
     public static final int PINLENGTH = 2;
 	private static final int TIMEOUT = 5;
 	
+	private static String userCreditCard = "";
+	private static String userPinCode = "";
 	
     
     
@@ -48,29 +50,51 @@ public class ATMServerThread extends Thread {
         return str;
     }
     
-    public void sendMessage(ServerMessage message)
+    public void sendMessage(ServerMessage message, boolean newLine)
     {
+    	
     	String sql = "SELECT word FROM " + currentLanguage.getName() + " WHERE " +
     			" id=" + (message.ordinal() + 1);
     	
     	ArrayList<String> result = queryDatabase(sql);
     	
     	if(result.size() != 0)
-    		out.println(result.get(0));
+    	{
+    		if(Debug.ON)
+        		System.out.println("Sending message " + result.get(0) + " to socket " + socket);
+    		if(newLine)
+    			out.println(result.get(0));
+    		else
+    			out.print(result.get(0));
+    	}
+    	else
+    		out.println("");
     }
     
-    public void sendMessage(String message)
+    public void sendMessage(ServerMessage message)
     {
-    	out.println(message);
+    	sendMessage(message, true);
+    }
+    
+    public void sendMessage(String message, boolean newLine)
+    {
+    	if(Debug.ON)
+    		System.out.println("Sending message " + message + " to socket " + socket);
+    	if(newLine)
+    		out.println(message);
+    	else
+    		out.print(message);
     }
     
     public void sendCode(int code)
     {
+    	if(Debug.ON)
+    		System.out.println("Sending code " + code + " to socket " + socket);
     	out.println(code);
     }
 
     public byte[] readBytes() throws IOException {
-        // Again, probably better to store these objects references in the support class
+        
         InputStream in = socket.getInputStream();
         DataInputStream dis = new DataInputStream(in);
         
@@ -210,9 +234,74 @@ public class ATMServerThread extends Thread {
     		sendCode(0);
     		return false;
     	}
+    	
+    	userCreditCard = creditcardSB.toString();
+    	userPinCode = pinSB.toString();
     		
     	sendCode(1);
         return true;
+    }
+    
+    private String getBalance()
+    {
+    	String sql = "SELECT balance FROM User WHERE creditCardNumber=" + userCreditCard + " AND pinCode=" + userPinCode;
+    	
+    	ArrayList<String> result = queryDatabase(sql);
+    	
+    	return result.get(0);
+    }
+    
+    private void getStatus()
+    {
+    	sendMessage(ServerMessage.BALANCESTATUS, false);
+    	
+    	String sql = "SELECT balance FROM User WHERE creditCardNumber=" + userCreditCard + " AND pinCode=" + userPinCode;
+    	
+    	ArrayList<String> result = queryDatabase(sql);
+    	
+    	sendMessage(result.get(0), false);
+    	sendMessage(ServerMessage.CURRENCY);
+    }
+    
+    private void withdraw() throws NumberFormatException, IOException
+    {
+    	
+    	sendMessage(ServerMessage.WITHDRAWINIT, true);
+    	
+    	
+    	long withdrawAmount = Long.parseLong(in.readLine());
+    	
+    	long balance = Long.parseLong(getBalance());    
+    	
+    	if(balance < withdrawAmount)
+    	{
+    		sendMessage(ServerMessage.WITHDRAWFAIL);
+    		return;
+    	}
+    	
+    	String updateQuery = "UPDATE User SET balance=" + (balance-withdrawAmount) + " WHERE creditCardNumber=" + userCreditCard + " AND pinCode=" + userPinCode;
+    	
+    	updateDatabase(updateQuery);
+    	
+    	sendMessage(ServerMessage.WITHDRAWSUCCESS);
+    }
+    
+    private void deposit() throws NumberFormatException, IOException
+    {
+    	
+    	sendMessage(ServerMessage.DEPOSITINIT, true);
+    	
+    	
+    	long depositAmount = Long.parseLong(in.readLine());
+    	
+    	long balance = Long.parseLong(getBalance());    
+    	
+    	
+    	String updateQuery = "UPDATE User SET balance=" + (balance+depositAmount) + " WHERE creditCardNumber=" + userCreditCard + " AND pinCode=" + userPinCode;
+    	
+    	updateDatabase(updateQuery);
+    	
+    	sendMessage(ServerMessage.DEPOSITSUCCESS);
     }
 
     public void run(){
@@ -236,25 +325,23 @@ public class ATMServerThread extends Thread {
             
             sendMessage(ServerMessage.VALIDLOGIN);
             
-            out.println("Welcome to Bank! (1)Balance, (2)Withdrawal, (3)Deposit, (4)Exit"); 
-            inputLine = readLine();
-            int choice = Integer.parseInt(inputLine);
+            int choice = 0;
             while (choice != 4) {
-                int deposit = 1;
-                switch (choice) {
-                case 2:
-                    deposit = -1;
-                case 3:
-                    out.println("Enter amount: ");	
-                    inputLine= readLine();
-                    value = Integer.parseInt(inputLine);
-                    balance += deposit * value;
+            	sendMessage(ServerMessage.GREETING);
+                inputLine = readLine();
+                choice = Integer.parseInt(inputLine);
+                switch (choice) 
+                {
                 case 1:
-                    out.println("Current balance is " + balance + " dollars");
-                    out.println("(1)Balance, (2)Withdrawal, (3)Deposit, (4)Exit");
-                    inputLine=readLine();
-                    choice = Integer.parseInt(inputLine);
+                    getStatus();
                     break;
+                case 2:
+                    withdraw();
+                	break;
+                case 3:
+                    //Deposit code
+                	break;
+                
                 case 4:
                     break;
                 default: 
