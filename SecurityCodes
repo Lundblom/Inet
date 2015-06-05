@@ -1,0 +1,64 @@
+
+
+CREATE TABLE SecurityCodes
+(
+	code int
+);
+
+INSERT INTO SecurityCodes (Code)
+VALUES( 01 );
+INSERT INTO SecurityCodes (Code)
+VALUES( 03 );
+INSERT INTO SecurityCodes (Code)
+VALUES( 05 );
+INSERT INTO SecurityCodes (Code)
+VALUES( 07 );
+INSERT INTO SecurityCodes (Code)
+VALUES( 09 );
+
+INSERT INTO SecurityCodes (Code)	VALUES ( 	11	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	13	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	15	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	17	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	19	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	21	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	23	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	25	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	27	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	29	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	31	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	33	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	35	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	37	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	39	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	41	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	43	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	45	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	47	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	49	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	51	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	53	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	55	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	57	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	59	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	61	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	63	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	65	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	67	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	69	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	71	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	73	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	75	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	77	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	79	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	81	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	83	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	85	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	87	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	89	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	91	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	93	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	95	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	97	);
+INSERT INTO SecurityCodes (Code)	VALUES ( 	99	);
+
