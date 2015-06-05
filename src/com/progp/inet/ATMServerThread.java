@@ -1,5 +1,6 @@
 package com.progp.inet;
 import java.io.*;
+import java.io.ObjectInputStream.GetField;
 import java.net.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -19,12 +20,14 @@ public class ATMServerThread extends Thread {
     
     final static String DATABASEURL = "jdbc:sqlite:database.db";
     
-    private Language currentLanguage = Language.SWEDISH;
+    private Language currentLanguage = Language.ENGLISH;
     
     public static final byte loginCode = 0b00000000;
     public static final byte statusCode = 0b00100000;
     public static final byte withdrawCode = 0b01000000;
     public static final byte depositCode = 0b01100000;
+    public static final byte messageCode = (byte)0b10000000;
+    public static final byte setLanguageCode = (byte) 0b10100000;
     public static final byte exitCode =  (byte) 0b11100000;
     
     public static final int SUCCESS = 1;
@@ -50,40 +53,44 @@ public class ATMServerThread extends Thread {
         return str;
     }
     
-    public void sendMessage(ServerMessage message, boolean newLine)
+    public void sendMessage(ServerMessage message)
     {
-    	
     	String sql = "SELECT word FROM " + currentLanguage.getName() + " WHERE " +
     			" id=" + (message.ordinal() + 1);
     	
     	ArrayList<String> result = queryDatabase(sql);
     	
+    	
+    	
     	if(result.size() != 0)
     	{
     		if(Debug.ON)
         		System.out.println("Sending message " + result.get(0) + " to socket " + socket);
-    		if(newLine)
-    			out.println(result.get(0));
-    		else
-    			out.print(result.get(0));
+    		out.print(result.get(0));
     	}
     	else
+    		if(Debug.ON)
+        		System.out.println("Sending empty string to socket " + socket);
     		out.println("");
     }
     
-    public void sendMessage(ServerMessage message)
+    public void sendStringMessage(String message)
     {
-    	sendMessage(message, true);
+    	out.println(message);
     }
     
-    public void sendMessage(String message, boolean newLine)
+    public String getMessageAsString(ServerMessage message)
     {
-    	if(Debug.ON)
-    		System.out.println("Sending message " + message + " to socket " + socket);
-    	if(newLine)
-    		out.println(message);
+    	String sql = "SELECT word FROM " + currentLanguage.getName() + " WHERE " +
+    			" id=" + (message.ordinal() + 1);
+    	
+    	ArrayList<String> result = queryDatabase(sql);
+    	if(result.size() != 0)
+    	{
+    		return result.get(0);
+    	}
     	else
-    		out.print(message);
+    		return "";
     }
     
     public void sendCode(int code)
@@ -99,6 +106,8 @@ public class ATMServerThread extends Thread {
         DataInputStream dis = new DataInputStream(in);
         
         int len = dis.readInt();
+        if(Debug.ON)
+        	System.out.println("In readBytes() with len " + len);
         byte[] data = new byte[len];
         if (len > 0) {
             dis.readFully(data);
@@ -250,24 +259,21 @@ public class ATMServerThread extends Thread {
     	
     	return result.get(0);
     }
-    
+
     private void getStatus()
     {
-    	sendMessage(ServerMessage.BALANCESTATUS, false);
+    	String balanceStart = getMessageAsString(ServerMessage.BALANCESTATUS);
     	
     	String sql = "SELECT balance FROM User WHERE creditCardNumber=" + userCreditCard + " AND pinCode=" + userPinCode;
     	
-    	ArrayList<String> result = queryDatabase(sql);
+    	String value = queryDatabase(sql).get(0);
     	
-    	sendMessage(result.get(0), false);
-    	sendMessage(ServerMessage.CURRENCY);
+    	String currency = getMessageAsString(ServerMessage.CURRENCY);
+    	sendStringMessage(balanceStart + value + currency);
     }
     
     private void withdraw() throws NumberFormatException, IOException
-    {
-    	
-    	sendMessage(ServerMessage.WITHDRAWINIT, true);
-    	
+    {	
     	
     	long withdrawAmount = Long.parseLong(in.readLine());
     	
@@ -275,23 +281,18 @@ public class ATMServerThread extends Thread {
     	
     	if(balance < withdrawAmount)
     	{
-    		sendMessage(ServerMessage.WITHDRAWFAIL);
+    		sendCode(0);
     		return;
     	}
     	
     	String updateQuery = "UPDATE User SET balance=" + (balance-withdrawAmount) + " WHERE creditCardNumber=" + userCreditCard + " AND pinCode=" + userPinCode;
     	
     	updateDatabase(updateQuery);
-    	
-    	sendMessage(ServerMessage.WITHDRAWSUCCESS);
+    	sendCode(1);
     }
     
     private void deposit() throws NumberFormatException, IOException
     {
-    	
-    	sendMessage(ServerMessage.DEPOSITINIT, true);
-    	
-    	
     	long depositAmount = Long.parseLong(in.readLine());
     	
     	long balance = Long.parseLong(getBalance());    
@@ -300,8 +301,6 @@ public class ATMServerThread extends Thread {
     	String updateQuery = "UPDATE User SET balance=" + (balance+depositAmount) + " WHERE creditCardNumber=" + userCreditCard + " AND pinCode=" + userPinCode;
     	
     	updateDatabase(updateQuery);
-    	
-    	sendMessage(ServerMessage.DEPOSITSUCCESS);
     }
 
     public void run(){
@@ -311,43 +310,62 @@ public class ATMServerThread extends Thread {
             in = new BufferedReader
                 (new InputStreamReader(socket.getInputStream()));
             
-            String inputLine, outputLine;
-	
-            int balance = 1000;
-            int value;
-            
-            //If we can't find the user
+            //If we can't find the use
+            if(Debug.ON)
+            	System.out.println("Validating User");
             if(validateUser() == false)
             {
+            	if(Debug.ON)
+            		System.out.println("Sending invalid Message");
             	sendMessage(ServerMessage.INVALIDLOGIN);
             	return;
             }
             
+            if(Debug.ON)
+        		System.out.println("Sending valid Message");
             sendMessage(ServerMessage.VALIDLOGIN);
             
-            int choice = 0;
-            while (choice != 4) {
-            	sendMessage(ServerMessage.GREETING);
-                inputLine = readLine();
-                choice = Integer.parseInt(inputLine);
-                switch (choice) 
-                {
-                case 1:
-                    getStatus();
-                    break;
-                case 2:
-                    withdraw();
-                	break;
-                case 3:
-                    //Deposit code
-                	break;
-                
-                case 4:
-                    break;
-                default: 
-                    break;
-                }
+            if(Debug.ON)
+        		System.out.println("Entering main loop");
+            
+            mainloop:
+            while(true)
+            {
+            	byte[] data = readBytes();
+            	
+            	byte code = data[0];
+            	
+            	switch(code)
+            	{
+            	case withdrawCode:
+            		withdraw();
+            		break;
+            	case depositCode:
+            		deposit();
+            		break;
+            		
+            	case messageCode:
+            		long message = 0;
+            		
+            		for(int i = 8; i < Long.SIZE / Byte.SIZE ; i--)
+            		{
+            			message += data[i] * 8 * Math.pow(2, i-1);
+            		}
+            		
+            		ServerMessage[] messages = ServerMessage.values();
+            		
+            		sendMessage(messages[(int)message]);
+            		sendCode(1);
+            		break;
+            		
+            	case setLanguageCode:
+            		break;
+            		
+            	case exitCode:
+            		break mainloop;
+            	}
             }
+            
             out.println("Good Bye");
             out.close();
             in.close();

@@ -8,14 +8,16 @@ CREATE TABLE User
 CREATE TABLE English
 (
   id varchar(255) NOT NULL PRIMARY KEY,
-  word carchar(255) NOT NULL
+  word varchar(255) NOT NULL
 );
 
 CREATE TABLE Swedish
 (
   id varchar(255) NOT NULL PRIMARY KEY,
-  word carchar(255) NOT NULL
+  word varchar(255) NOT NULL
 );
+
+
 
 
 

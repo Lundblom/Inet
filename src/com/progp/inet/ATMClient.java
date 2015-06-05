@@ -11,10 +11,20 @@ public class ATMClient {
 	private static int connectionPort = 8989;
 	private static Socket ATMSocket = null;
 
+	public static boolean sendBytes(byte[] myByteArray, BufferedReader in) throws IOException {
+		return sendBytes(myByteArray, 0, myByteArray.length, in);
+	}
+	
 	public static void sendBytes(byte[] myByteArray) throws IOException {
 		sendBytes(myByteArray, 0, myByteArray.length);
 	}
 
+	public static boolean sendBytes(byte[] myByteArray, int start, int len, BufferedReader in)
+			throws IOException {
+		sendBytes(myByteArray, start, len);
+		return getAnswerCode(in);
+	}
+	
 	public static void sendBytes(byte[] myByteArray, int start, int len)
 			throws IOException {
 		if (len < 0)
@@ -27,12 +37,18 @@ public class ATMClient {
 		// just like the socket variable.
 		OutputStream out = ATMSocket.getOutputStream();
 		DataOutputStream dos = new DataOutputStream(out);
+		
+		if(Debug.ON)
+			System.out.println("In sendBytes() with array" + myByteArray + " and start " + start + " and len " + len);
 
 		dos.writeInt(len);
 		if (len > 0) {
 			dos.write(myByteArray, start, len);
 		}
+		
 	}
+	
+	
 
 	public static boolean getAnswerCode(BufferedReader in) throws IOException 
 	{
@@ -52,7 +68,7 @@ public class ATMClient {
 		System.out.println(message);
 	}
 
-	public static byte[] convertStringToBytes(String string) {
+	public static byte[] convertIntegerStringToBytes(String string) {
 		byte[] result = new byte[string.length()];
 
 		for (int i = 0; i < string.length(); i++) {
@@ -63,10 +79,35 @@ public class ATMClient {
 
 		return result;
 	}
+	
+	public static void recieveResponse(BufferedReader in) throws IOException
+	{
+		String response = in.readLine();
+		
+		System.out.println(response);
+	}
+	
+	public static void getServerMessage(ServerMessage message, BufferedReader in) throws IOException
+	{
+		if(Debug.ON)
+			System.out.println("Received message: " + message);
+		
+		byte[] convertedStringBytes = convertIntegerStringToBytes(String.valueOf(message.ordinal()));
+		
+		byte[] messageBytes = new byte[10];
+		messageBytes[0] = ATMServerThread.messageCode;
+		
+		for(int i = 0; i < convertedStringBytes.length; i++)
+		{
+			messageBytes[i+1] += convertedStringBytes[i];
+		}
+		
+		sendBytes(messageBytes, in);
+	}
 
 	public static byte[] createLoginBytes(String ccn, String pin) {
-		byte[] creditCardBytes = convertStringToBytes(ccn);
-		byte[] creditPinBytes = convertStringToBytes(pin);
+		byte[] creditCardBytes = convertIntegerStringToBytes(ccn);
+		byte[] creditPinBytes = convertIntegerStringToBytes(pin);
 
 		return new byte[] { ATMServerThread.loginCode,
 				(byte) (creditCardBytes[0] * 16 + creditCardBytes[1]),
@@ -79,6 +120,47 @@ public class ATMClient {
 				(byte) (creditCardBytes[14] * 16 + creditCardBytes[15]),
 				(byte) (creditPinBytes[0] * 16 + creditPinBytes[1]) };
 	}
+	
+	public static byte[] createStatusBytes()
+	{
+		return new byte[] {ATMServerThread.statusCode};
+	}
+	
+	public static byte[] createWithdrawalBytes(String amount, String safetyCode)
+	{
+		byte[] amountBytes = convertIntegerStringToBytes(amount);
+		byte[] safetyCodeBytes = convertIntegerStringToBytes(safetyCode);
+		
+		return new byte[] { ATMServerThread.withdrawCode,
+				(byte) (amountBytes[0] * 16 + amountBytes[1]),
+				(byte) (amountBytes[2] * 16 + amountBytes[3]),
+				(byte) (amountBytes[4] * 16 + amountBytes[5]),
+				(byte) (amountBytes[6] * 16 + amountBytes[7]),
+				(byte) (amountBytes[8] * 16 + amountBytes[9]),
+				(byte) (amountBytes[10] * 16 + amountBytes[11]),
+				(byte) (amountBytes[12] * 16 + amountBytes[13]),
+				(byte) (amountBytes[14] * 16 + amountBytes[15]),
+				(byte) (safetyCodeBytes[0] * 16 + safetyCodeBytes[1]) };		
+	}
+	
+	public static byte[] createDepositBytes(String amount, String safetyCode)
+	{
+		byte[] amountBytes = convertIntegerStringToBytes(amount);
+		byte[] safetyCodeBytes = convertIntegerStringToBytes(safetyCode);
+		
+		
+		return new byte[] { ATMServerThread.depositCode,
+				(byte) (amountBytes[0] * 16 + amountBytes[1]),
+				(byte) (amountBytes[2] * 16 + amountBytes[3]),
+				(byte) (amountBytes[4] * 16 + amountBytes[5]),
+				(byte) (amountBytes[6] * 16 + amountBytes[7]),
+				(byte) (amountBytes[8] * 16 + amountBytes[9]),
+				(byte) (amountBytes[10] * 16 + amountBytes[11]),
+				(byte) (amountBytes[12] * 16 + amountBytes[13]),
+				(byte) (amountBytes[14] * 16 + amountBytes[15]),
+				(byte) (safetyCodeBytes[0] * 16 + safetyCodeBytes[1]) };		
+	}
+	
 
 	public static void main(String[] args) throws IOException {
 
@@ -141,29 +223,55 @@ public class ATMClient {
 
 		
 		int menuOption;
-		int userInput;
 
 		while (true) 
 		{
-			getMessage(in);
+			getServerMessage(ServerMessage.GREETING, in);
 			
 			System.out.print("> ");
 			menuOption = scanner.nextInt();
-			System.out.println(menuOption);
 			
-			out.println(menuOption);
 			if (menuOption == 1) 
 			{
-				System.out.println("In option 1");
-				System.out.println(in.readLine());
+				sendBytes(createStatusBytes());
+				recieveResponse(in);
 			}
-			else if(menuOption == 2 || menuOption == 3)
+			else if(menuOption == 3)
 			{
-				System.out.println("In option 2 or 3");
-				getMessage(in);
-				userInput = scanner.nextInt();
-				out.println(userInput);
-				getMessage(in);
+				System.out.print("Enter amount: ");
+				int depositAmount = scanner.nextInt();
+				System.out.println();
+				
+				System.out.print("Enter code: ");
+				int safetyCode = scanner.nextInt();
+				System.out.println();
+				
+								
+				sendBytes(createDepositBytes(String.valueOf(depositAmount), String.valueOf(safetyCode)), in);
+				getServerMessage(ServerMessage.DEPOSITSUCCESS, in);
+
+			}
+			else if(menuOption == 2)
+			{
+				
+				System.out.print("Enter amount: ");
+				scanner.nextLine();
+				String withdrawAmount = scanner.nextLine();
+				
+				System.out.print("Enter code: ");
+				int safetyCode = scanner.nextInt();
+				System.out.println();
+				
+								
+				boolean response = sendBytes(createWithdrawalBytes(String.valueOf(withdrawAmount), String.valueOf(safetyCode)), in);
+				if(response)
+				{
+					getServerMessage(ServerMessage.WITHDRAWSUCCESS, in);
+				}
+				else
+				{
+					getServerMessage(ServerMessage.WITHDRAWFAIL, in);
+				}
 			}
 			else 
 			{
