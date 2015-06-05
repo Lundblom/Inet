@@ -1,7 +1,9 @@
 package com.progp.inet;
 import java.io.*;
 import java.io.ObjectInputStream.GetField;
+import java.lang.reflect.Array;
 import java.net.*;
+import java.security.InvalidParameterException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -47,12 +49,9 @@ public class ATMServerThread extends Thread {
         this.socket = socket;
     }
 
-    private String readLine() throws IOException {
-        String str = in.readLine();
-        System.out.println(""  + socket + " : " + str);
-        return str;
-    }
-    
+    /**
+     * Sends a message specified in the enum ServerMessage to the client
+     */
     public void sendMessage(ServerMessage message)
     {
     	String sql = "SELECT word FROM " + currentLanguage.getName() + " WHERE " +
@@ -74,11 +73,20 @@ public class ATMServerThread extends Thread {
     		out.println("");
     }
     
+    /**
+     * Sends a message that is not predefined in the database
+     * @param message
+     */
     public void sendStringMessage(String message)
     {
     	out.println(message);
     }
     
+    /**
+     * Gets a message from the SQL database
+     * @param message The message ID to be retrieved
+     * @return The message as a string
+     */
     public String getMessageAsString(ServerMessage message)
     {
     	String sql = "SELECT word FROM " + currentLanguage.getName() + " WHERE " +
@@ -93,13 +101,27 @@ public class ATMServerThread extends Thread {
     		return "";
     }
     
+    /**
+     * Sends a confirmation code for request to the user. 1 is success, 0 is fail
+     * @param code The code to be sent, has to be 1 or 0.
+     */
     public void sendCode(int code)
     {
+    	if(code > 1 || code < 0)
+    	{
+    		throw new InvalidParameterException();
+    	}
+    		
     	if(Debug.ON)
     		System.out.println("Sending code " + code + " to socket " + socket);
     	out.println(code);
     }
 
+    /**
+     * Reads a byte array sent by the connected client
+     * @return The read data
+     * @throws IOException
+     */
     public byte[] readBytes() throws IOException {
         
         InputStream in = socket.getInputStream();
@@ -115,7 +137,11 @@ public class ATMServerThread extends Thread {
         return data;
     }
     
-  //What makes the SQL work
+  /**
+   * Updates the SQL database with the specified query
+   * @param query 
+   * @return Returns false if an error has occurred when contacting the database.
+   */
     public boolean updateDatabase(String query)
     {
     	Connection conn = null;
@@ -125,10 +151,8 @@ public class ATMServerThread extends Thread {
 			System.out.println("CANT CONNECT!");
 			e.printStackTrace();
 		}
-        System.out.println("Connected to database");
         try {
             Statement stmt = conn.createStatement();
-            System.out.println("Created statement");
             try 
             {
                 stmt.setQueryTimeout(TIMEOUT);
@@ -152,7 +176,12 @@ public class ATMServerThread extends Thread {
         return true;
     }
     
-    //ArrayList for parsing SQL queries
+    /**
+     * Queries the database with the specified SQL query and returns the response as
+     * an arraylist
+     * @param query
+     * @return All matching entries, in found order.
+     */
     public ArrayList<String> queryDatabase(String query)
     {
     	Connection conn = null;
@@ -166,10 +195,8 @@ public class ATMServerThread extends Thread {
 			System.out.println("CANT CONNECT!");
 			e.printStackTrace();
 		}
-        System.out.println("Connected to database");
         try {
             Statement stmt = conn.createStatement();
-            System.out.println("Created statement");
             try {
                 stmt.setQueryTimeout(TIMEOUT);
                 System.out.println("Set timeout");
@@ -205,6 +232,12 @@ public class ATMServerThread extends Thread {
         return result;
     }
 
+    /**
+     * Method that connects the client with the sent credentials.
+     * If the credentails are not found the user can't connect
+     * @return Returns false if the credentials are not in the database
+     * @throws IOException
+     */
     private boolean validateUser() throws IOException 
     {
     	byte[] result = readBytes();
@@ -251,6 +284,10 @@ public class ATMServerThread extends Thread {
         return true;
     }
     
+    /**
+     * Gets the connected user's balance from the SQL database as a String.
+     * @return
+     */
     private String getBalance()
     {
     	String sql = "SELECT balance FROM User WHERE creditCardNumber=" + userCreditCard + " AND pinCode=" + userPinCode;
@@ -260,6 +297,10 @@ public class ATMServerThread extends Thread {
     	return result.get(0);
     }
 
+    /**
+     * Gets the connects user's balance and sends a success code and the complete status message
+     * to the user.
+     */
     private void getStatus()
     {
     	String balanceStart = getMessageAsString(ServerMessage.BALANCESTATUS);
@@ -269,19 +310,44 @@ public class ATMServerThread extends Thread {
     	String value = queryDatabase(sql).get(0);
     	
     	String currency = getMessageAsString(ServerMessage.CURRENCY);
+    	
+    	sendCode(1);
+    	
     	sendStringMessage(balanceStart + value + currency);
     }
     
-    private void withdraw() throws NumberFormatException, IOException
+    /** 
+     * Handler for when the client sends a withdraw request
+     * @param withdrawAmount Amount of money to be withdrawn
+     * @param pinCode The user's security code for transfers
+     * @throws NumberFormatException
+     * @throws IOException
+     */
+    private void withdraw(long withdrawAmount, String pinCode) throws NumberFormatException, IOException
     {	
+    	String sql = "SELECT * FROM SecurityCodes WHERE code=" + pinCode;
     	
-    	long withdrawAmount = Long.parseLong(in.readLine());
+    	ArrayList<String> result = queryDatabase(sql);
     	
-    	long balance = Long.parseLong(getBalance());    
+    	if(result.size() == 0)
+    	{
+    		sendCode(0);
+    		sendMessage(ServerMessage.PINFAIL);
+    	}
+    	
+    	long balance = Long.parseLong(getBalance());   
+    	
+    	if(Debug.ON)
+    	{
+    		System.out.println("Balance in withdraw is: " + balance);
+    		System.out.println("Withdraw amount in withdraw is: " + withdrawAmount);
+    	}
+    	
     	
     	if(balance < withdrawAmount)
     	{
     		sendCode(0);
+    		sendMessage(ServerMessage.WITHDRAWFAIL);
     		return;
     	}
     	
@@ -289,13 +355,35 @@ public class ATMServerThread extends Thread {
     	
     	updateDatabase(updateQuery);
     	sendCode(1);
+    	sendMessage(ServerMessage.WITHDRAWSUCCESS);
     }
     
-    private void deposit() throws NumberFormatException, IOException
+    /**
+     * Handler for when the client sends a deposit request.
+     * @param depositAmount Amount of money to be deposited.
+     * @param pinCode The user's security code for transfers
+     * @throws NumberFormatException
+     * @throws IOException
+     */
+    private void deposit(long depositAmount, String pinCode) throws NumberFormatException, IOException
     {
-    	long depositAmount = Long.parseLong(in.readLine());
+    	String sql = "SELECT * FROM SecurityCodes WHERE code=" + pinCode;
     	
-    	long balance = Long.parseLong(getBalance());    
+    	ArrayList<String> result = queryDatabase(sql);
+    	
+    	if(result.size() == 0)
+    	{
+    		sendCode(0);
+    		sendMessage(ServerMessage.PINFAIL);
+    	}
+    	
+    	long balance = Long.parseLong(getBalance());   
+    	
+    	if(Debug.ON)
+    	{
+    		System.out.println("Balance in withdraw is: " + balance);
+    		System.out.println("Withdraw amount in withdraw is: " + depositAmount);
+    	}   
     	
     	
     	String updateQuery = "UPDATE User SET balance=" + (balance+depositAmount) + " WHERE creditCardNumber=" + userCreditCard + " AND pinCode=" + userPinCode;
@@ -303,6 +391,46 @@ public class ATMServerThread extends Thread {
     	updateDatabase(updateQuery);
     }
 
+    
+    /**
+     * Gets the withdraw/deposit value and the pincode from the data
+     * that the client has sent
+     * @param data The data sent b the client
+     * @return An array with 2 elements: 0 is the value and 1 is the pin
+     */
+    public ArrayList<String> withdrawAndDepositDataGetter(byte[] data)
+    {
+    	StringBuilder amountAsString = new StringBuilder();
+		int loopLength = 8;
+		
+		String pinCode = "";
+		
+		int pinOne = Byte.valueOf((byte) (data[9] >> 4));
+		int pinTwo = Byte.valueOf((byte) (data[9] & 0xf));
+		
+		pinCode += (String.valueOf(pinOne) + String.valueOf(pinTwo));
+		
+		
+		for(int i = 1; i < loopLength; i++)
+    	{
+    		Byte b = (byte) (data[i+1] & 0xff);
+			Byte highNibble = (byte) ((byte)(b >> 4) & 0x0f);
+			Byte lowNibble = ((byte)(b & 0x0f));
+			amountAsString.append(String.valueOf((int)highNibble));
+			amountAsString.append(String.valueOf((int)lowNibble));
+    	}
+		
+		ArrayList<String> result = new ArrayList<String>();
+		result.add(amountAsString.toString());
+		result.add(pinCode);
+		
+		return result;
+		
+    }
+    
+    /**
+     * Main loop for the thread.
+     */
     public void run(){
          
         try {
@@ -323,6 +451,7 @@ public class ATMServerThread extends Thread {
             
             if(Debug.ON)
         		System.out.println("Sending valid Message");
+            
             sendMessage(ServerMessage.VALIDLOGIN);
             
             if(Debug.ON)
@@ -337,11 +466,28 @@ public class ATMServerThread extends Thread {
             	
             	switch(code)
             	{
+            	case statusCode:
+            		if(Debug.ON)
+                		System.out.println("Entering status");
+            		getStatus();
+            		break;
             	case withdrawCode:
-            		withdraw();
+            		if(Debug.ON)
+                		System.out.println("Entering withdraw");
+            		
+            		ArrayList<String> withdrawData = withdrawAndDepositDataGetter(data);
+            		
+            		withdraw(Integer.parseInt(withdrawData.get(0)), withdrawData.get(1));
+            		
+            		
             		break;
             	case depositCode:
-            		deposit();
+            		if(Debug.ON)
+                		System.out.println("Entering deposit");
+            		
+            		ArrayList<String> depositData = withdrawAndDepositDataGetter(data);
+            		
+            		deposit(Integer.parseInt(depositData.get(0)), depositData.get(1));
             		break;
             		
             	case messageCode:
@@ -354,8 +500,8 @@ public class ATMServerThread extends Thread {
             		
             		ServerMessage[] messages = ServerMessage.values();
             		
-            		sendMessage(messages[(int)message]);
             		sendCode(1);
+            		sendMessage(messages[(int)message]);
             		break;
             		
             	case setLanguageCode:

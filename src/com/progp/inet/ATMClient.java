@@ -11,21 +11,14 @@ public class ATMClient {
 	private static int connectionPort = 8989;
 	private static Socket ATMSocket = null;
 
-	public static boolean sendBytes(byte[] myByteArray, BufferedReader in) throws IOException {
-		return sendBytes(myByteArray, 0, myByteArray.length, in);
-	}
+	private static BufferedReader in;
 	
-	public static void sendBytes(byte[] myByteArray) throws IOException {
-		sendBytes(myByteArray, 0, myByteArray.length);
+	public static boolean sendRequest(byte[] myByteArray) throws IOException {
+		return sendRequest(myByteArray, 0, myByteArray.length);
 	}
 
-	public static boolean sendBytes(byte[] myByteArray, int start, int len, BufferedReader in)
-			throws IOException {
-		sendBytes(myByteArray, start, len);
-		return getAnswerCode(in);
-	}
 	
-	public static void sendBytes(byte[] myByteArray, int start, int len)
+	public static boolean sendRequest(byte[] myByteArray, int start, int len)
 			throws IOException {
 		if (len < 0)
 			throw new IllegalArgumentException("Negative length not allowed");
@@ -39,18 +32,20 @@ public class ATMClient {
 		DataOutputStream dos = new DataOutputStream(out);
 		
 		if(Debug.ON)
-			System.out.println("In sendBytes() with array" + myByteArray + " and start " + start + " and len " + len);
+			System.out.println("In sendRequest() with array" + myByteArray + " and start " + start + " and len " + len);
 
 		dos.writeInt(len);
 		if (len > 0) {
 			dos.write(myByteArray, start, len);
 		}
-		
+		boolean code = getAnswerCode();
+		getMessage();	
+		return code;
 	}
 	
 	
 
-	public static boolean getAnswerCode(BufferedReader in) throws IOException 
+	public static boolean getAnswerCode() throws IOException 
 	{
 		String code = in.readLine();
 		if(Debug.ON)
@@ -60,7 +55,7 @@ public class ATMClient {
 		return true;
 	}
 
-	public static void getMessage(BufferedReader in) throws IOException 
+	public static void getMessage() throws IOException 
 	{
 		String message = in.readLine();
 		if(Debug.ON)
@@ -79,15 +74,9 @@ public class ATMClient {
 
 		return result;
 	}
+
 	
-	public static void recieveResponse(BufferedReader in) throws IOException
-	{
-		String response = in.readLine();
-		
-		System.out.println(response);
-	}
-	
-	public static void getServerMessage(ServerMessage message, BufferedReader in) throws IOException
+	public static void getServerMessage(ServerMessage message) throws IOException
 	{
 		if(Debug.ON)
 			System.out.println("Received message: " + message);
@@ -102,7 +91,7 @@ public class ATMClient {
 			messageBytes[i+1] += convertedStringBytes[i];
 		}
 		
-		sendBytes(messageBytes, in);
+		sendRequest(messageBytes);
 	}
 
 	public static byte[] createLoginBytes(String ccn, String pin) {
@@ -128,7 +117,20 @@ public class ATMClient {
 	
 	public static byte[] createWithdrawalBytes(String amount, String safetyCode)
 	{
+		
+		while(amount.length() < 16)
+		{
+			amount = "0" + amount;
+		}
+		
+		while(safetyCode.length() < 2)
+		{
+			safetyCode = "0" + safetyCode;
+		}
+		
 		byte[] amountBytes = convertIntegerStringToBytes(amount);
+		
+		
 		byte[] safetyCodeBytes = convertIntegerStringToBytes(safetyCode);
 		
 		return new byte[] { ATMServerThread.withdrawCode,
@@ -145,6 +147,17 @@ public class ATMClient {
 	
 	public static byte[] createDepositBytes(String amount, String safetyCode)
 	{
+		
+		while(amount.length() < 16)
+		{
+			amount = "0" + amount;
+		}
+		
+		while(safetyCode.length() < 2)
+		{
+			safetyCode = "0" + safetyCode;
+		}
+		
 		byte[] amountBytes = convertIntegerStringToBytes(amount);
 		byte[] safetyCodeBytes = convertIntegerStringToBytes(safetyCode);
 		
@@ -165,7 +178,6 @@ public class ATMClient {
 	public static void main(String[] args) throws IOException {
 
 		PrintWriter out = null;
-		BufferedReader in = null;
 		String adress = "";
 		Scanner scanner = new Scanner(System.in);
 		while (true) {
@@ -212,12 +224,9 @@ public class ATMClient {
 				break;
 			}
 
-			sendBytes(createLoginBytes(creditCardNumber, pinCode));
-			if (getAnswerCode(in)) {
-				getMessage(in);
+			boolean code = sendRequest(createLoginBytes(creditCardNumber, pinCode));
+			if (code)
 				break;
-			} else
-				getMessage(in);
 
 		}
 
@@ -226,15 +235,14 @@ public class ATMClient {
 
 		while (true) 
 		{
-			getServerMessage(ServerMessage.GREETING, in);
+			getServerMessage(ServerMessage.GREETING);
 			
 			System.out.print("> ");
 			menuOption = scanner.nextInt();
 			
 			if (menuOption == 1) 
 			{
-				sendBytes(createStatusBytes());
-				recieveResponse(in);
+				sendRequest(createStatusBytes());
 			}
 			else if(menuOption == 3)
 			{
@@ -247,8 +255,7 @@ public class ATMClient {
 				System.out.println();
 				
 								
-				sendBytes(createDepositBytes(String.valueOf(depositAmount), String.valueOf(safetyCode)), in);
-				getServerMessage(ServerMessage.DEPOSITSUCCESS, in);
+				sendRequest(createDepositBytes(String.valueOf(depositAmount), String.valueOf(safetyCode)));
 
 			}
 			else if(menuOption == 2)
@@ -263,15 +270,7 @@ public class ATMClient {
 				System.out.println();
 				
 								
-				boolean response = sendBytes(createWithdrawalBytes(String.valueOf(withdrawAmount), String.valueOf(safetyCode)), in);
-				if(response)
-				{
-					getServerMessage(ServerMessage.WITHDRAWSUCCESS, in);
-				}
-				else
-				{
-					getServerMessage(ServerMessage.WITHDRAWFAIL, in);
-				}
+				sendRequest(createWithdrawalBytes(String.valueOf(withdrawAmount), String.valueOf(safetyCode)));
 			}
 			else 
 			{
