@@ -2,6 +2,7 @@ package com.progp.inet;
 
 import java.io.*;
 import java.net.*;
+import java.security.InvalidParameterException;
 import java.util.Scanner;
 
 /**
@@ -191,6 +192,19 @@ public class ATMClient {
 				(byte) (safetyCodeBytes[0] * 16 + safetyCodeBytes[1]) };		
 	}
 	
+	public static byte[] createLanguageBytes(int languageCode)
+	{
+		if(languageCode > 127)
+			throw new InvalidParameterException();
+		
+		byte[] languageBytes = new byte[2];
+		
+		languageBytes[0] = ATMServerThread.setLanguageCode;
+		languageBytes[1] = (byte)languageCode;
+		
+		return languageBytes;
+	}
+	
 	public static byte[] createDepositBytes(String amount, String safetyCode)
 	{
 		//Makes sure that the Deposit amount fills the entire array
@@ -304,6 +318,22 @@ public class ATMClient {
 			if (menuOption == 1) 
 			{
 				sendRequest(createStatusBytes());
+			}
+			else if(menuOption == 4)
+			{
+				Language[] languages = Language.values();
+				System.out.println("Available languages ");
+			 	
+				for(int i = 0; i < languages.length; i++)
+				{
+					System.out.println("(" + (i+1) + ") " + languages[i].toString());
+				}
+				
+				System.out.print("Choose your language: ");
+				int selectedLanguage = scanner.nextInt() - 1;
+			 	
+				
+				sendRequest(createLanguageBytes(selectedLanguage));
 			}
 			else if(menuOption == 3)
 			{

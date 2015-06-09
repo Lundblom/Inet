@@ -313,7 +313,12 @@ public class ATMServerThread extends Thread {
     	
     	sendCode(1);
     	
-    	sendStringMessage(balanceStart + value + currency);
+    	sendStringMessage(balanceStart + " " + value + " " + currency);
+    }
+    
+    private void setLanguage(Language l)
+    {
+    	currentLanguage = l;
     }
     
     /** 
@@ -505,6 +510,13 @@ public class ATMServerThread extends Thread {
             		break;
             		
             	case setLanguageCode:
+            		int languageCode = data[1];
+            		
+            		Language l = Language.values()[languageCode];
+            		
+            		setLanguage(l);
+            		sendCode(1);
+            		sendMessage(ServerMessage.LANGUAGESUCCESS);
             		break;
             		
             	case exitCode:
