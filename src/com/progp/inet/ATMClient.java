@@ -18,6 +18,15 @@ public class ATMClient {
 	}
 
 	
+	/**
+	 * This method sends a specific byte pattern to the ATMServer. This is converted into
+	 * some request by the server and some response is received and printed on the client's screen.
+	 * @param myByteArray The array to be sent, the first byte should match one of the command codes in ATMServerThread.
+	 * @param start where to start(usually 0).
+	 * @param len Length of the array (usually myByteArray.length).
+	 * @return Returns false if the request failed.
+	 * @throws IOException
+	 */
 	public static boolean sendRequest(byte[] myByteArray, int start, int len)
 			throws IOException {
 		if (len < 0)
@@ -44,7 +53,11 @@ public class ATMClient {
 	}
 	
 	
-
+	/**
+	 * Receives a boolean code that the server sends via the socket connection
+	 * @return The sent code, true or false
+	 * @throws IOException
+	 */
 	public static boolean getAnswerCode() throws IOException 
 	{
 		String code = in.readLine();
@@ -54,7 +67,11 @@ public class ATMClient {
 			return false;
 		return true;
 	}
-
+	
+	/**
+	 * Gets a string that the server is sending over the socket and prints it to console.
+	 * @throws IOException
+	 */
 	public static void getMessage() throws IOException 
 	{
 		String message = in.readLine();
@@ -63,6 +80,12 @@ public class ATMClient {
 		System.out.println(message);
 	}
 
+	/** 
+	 * A method for converting a String consisting of only integer characters to a byte value 
+	 * ranging from 0 to 9. Will crash if the String contains non numerical characters.
+	 * @param string The string to be converted.
+	 * @return The converted array.
+	 */
 	public static byte[] convertIntegerStringToBytes(String string) {
 		byte[] result = new byte[string.length()];
 
@@ -75,7 +98,12 @@ public class ATMClient {
 		return result;
 	}
 
-	
+	/**
+	 * Requests one of the predefined ServerMessages contained in the enum ServerMessage and
+	 * prints it on the console. The message received varies depending on which language is set in ATMServerThread.
+	 * @param message The message ID.
+	 * @throws IOException
+	 */
 	public static void getServerMessage(ServerMessage message) throws IOException
 	{
 		if(Debug.ON)
@@ -93,8 +121,17 @@ public class ATMClient {
 		
 		sendRequest(messageBytes);
 	}
-
+	
+	/**
+	 * Creates a byte array containing the a credit card number of 16 characters
+	 * and a pin containing 2 characters. 
+	 * @param ccn The credit card number to be added to the byte array.
+	 * @param pin The pin to be added to the byte array.
+	 * @return The converted array.
+	 */
 	public static byte[] createLoginBytes(String ccn, String pin) {
+		
+		//Converts the user info the byte-form.
 		byte[] creditCardBytes = convertIntegerStringToBytes(ccn);
 		byte[] creditPinBytes = convertIntegerStringToBytes(pin);
 
@@ -110,19 +147,28 @@ public class ATMClient {
 				(byte) (creditPinBytes[0] * 16 + creditPinBytes[1]) };
 	}
 	
+	
 	public static byte[] createStatusBytes()
 	{
 		return new byte[] {ATMServerThread.statusCode};
 	}
 	
+	/**
+	 * Creates the byte array used when sending a withdraw request to 
+	 * the server.
+	 * @param amount Amount to withdraw
+	 * @param safetyCode The pre defined security code. Has to match the codes in the SQL database.
+	 * @return
+	 */
 	public static byte[] createWithdrawalBytes(String amount, String safetyCode)
 	{
 		
+		//Makes sure that the withdrawal amount fills the entire array
 		while(amount.length() < 16)
 		{
 			amount = "0" + amount;
 		}
-		
+		//Same thing here
 		while(safetyCode.length() < 2)
 		{
 			safetyCode = "0" + safetyCode;
@@ -147,12 +193,12 @@ public class ATMClient {
 	
 	public static byte[] createDepositBytes(String amount, String safetyCode)
 	{
-		
+		//Makes sure that the Deposit amount fills the entire array
 		while(amount.length() < 16)
 		{
 			amount = "0" + amount;
 		}
-		
+
 		while(safetyCode.length() < 2)
 		{
 			safetyCode = "0" + safetyCode;
@@ -180,40 +226,53 @@ public class ATMClient {
 		PrintWriter out = null;
 		String adress = "";
 		Scanner scanner = new Scanner(System.in);
-		while (true) {
-			try {
+		while (true) 
+		{
+			//This part creates a connection the the IP.
+			try 
+			{
 				adress = args[0];
-			} catch (ArrayIndexOutOfBoundsException e) {
+			} 
+			catch (ArrayIndexOutOfBoundsException e) 
+			{
 				System.err.println("Missing argument ip-adress");
 				System.exit(1);
 			}
-			try {
+			
+			try 
+			{
 				ATMSocket = new Socket(adress, connectionPort);
 				out = new PrintWriter(ATMSocket.getOutputStream(), true);
 				in = new BufferedReader(new InputStreamReader(
 						ATMSocket.getInputStream()));
-			} catch (UnknownHostException e) {
+			} 
+			catch (UnknownHostException e) 
+			{
 				System.err.println("Unknown host: " + adress);
 				System.exit(1);
-			} catch (IOException e) {
+			} 
+			catch (IOException e) 
+			{
 				System.err.println("Couldn't open connection to " + adress);
 				System.exit(1);
 			}
 
+			//Loop for handling credit card number
 			String creditCardNumber;
-			while (true) {
+			while (true) 
+			{
 				System.out.print("Enter your credit card number: ");
 				creditCardNumber = scanner.nextLine();
-				if (creditCardNumber.length() != 16) {
+				if (creditCardNumber.length() != 16) 
+				{
 					System.out.println("Please enter a number of length 16");
 					continue;
 				}
 				break;
 			}
-			System.out.println();
 
+			//Loop for handling pin code
 			String pinCode;
-
 			while (true) {
 				System.out.print("Enter your pin code: ");
 				pinCode = scanner.nextLine();
@@ -224,6 +283,8 @@ public class ATMClient {
 				break;
 			}
 
+			//Gets the confirmation code from the server
+			//Loops again if the credentials are invalid
 			boolean code = sendRequest(createLoginBytes(creditCardNumber, pinCode));
 			if (code)
 				break;
