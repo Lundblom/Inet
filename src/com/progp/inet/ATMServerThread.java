@@ -126,8 +126,17 @@ public class ATMServerThread extends Thread {
         
         InputStream in = socket.getInputStream();
         DataInputStream dis = new DataInputStream(in);
-        
-        int len = dis.readInt();
+        int len = 0;
+        try
+        {
+        	len = dis.readInt();
+        }
+        catch(EOFException e)
+        {
+        	if(Debug.ON)
+        		System.out.println("No data recieved from " + socket);
+        	return null;
+        }
         if(Debug.ON)
         	System.out.println("In readBytes() with len " + len);
         byte[] data = new byte[len];
@@ -486,6 +495,8 @@ public class ATMServerThread extends Thread {
             		System.out.println("Socket " + socket + " closed unexpectedly.");
             		return;
             	}
+            	if(data == null)
+            		continue;
             	
             	byte code = data[0];
             	

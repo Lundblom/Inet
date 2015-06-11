@@ -158,7 +158,7 @@ public class ATMClient {
 	 * Creates the byte array used when sending a withdraw request to 
 	 * the server.
 	 * @param amount Amount to withdraw
-	 * @param safetyCode The pre defined security code. Has to match the codes in the SQL database.
+	 * @param safetyCode The predefined security code. Has to match the codes in the SQL database.
 	 * @return
 	 */
 	public static byte[] createWithdrawalBytes(String amount, String safetyCode)
@@ -237,140 +237,162 @@ public class ATMClient {
 
 	public static void main(String[] args) throws IOException {
 
-		PrintWriter out = null;
-		String adress = "";
-		Scanner scanner = new Scanner(System.in);
-		while (true) 
+		programloop:
+		while(true)
 		{
-			//This part creates a connection the the IP.
-			try 
-			{
-				adress = args[0];
-			} 
-			catch (ArrayIndexOutOfBoundsException e) 
-			{
-				System.err.println("Missing argument ip-adress");
-				System.exit(1);
-			}
-			
-			try 
-			{
-				ATMSocket = new Socket(adress, connectionPort);
-				out = new PrintWriter(ATMSocket.getOutputStream(), true);
-				in = new BufferedReader(new InputStreamReader(
-						ATMSocket.getInputStream()));
-			} 
-			catch (UnknownHostException e) 
-			{
-				System.err.println("Unknown host: " + adress);
-				System.exit(1);
-			} 
-			catch (IOException e) 
-			{
-				System.err.println("Couldn't open connection to " + adress);
-				System.exit(1);
-			}
-
-			//Loop for handling credit card number
-			String creditCardNumber;
+			PrintWriter out = null;
+			String adress = "";
+			Scanner scanner = new Scanner(System.in);
 			while (true) 
 			{
-				System.out.print("Enter your credit card number: ");
-				creditCardNumber = scanner.nextLine();
-				if (creditCardNumber.length() != 16) 
+				//This part creates a connection the the IP.
+				try 
 				{
-					System.out.println("Please enter a number of length 16");
-					continue;
-				}
-				break;
-			}
-
-			//Loop for handling pin code
-			String pinCode;
-			while (true) {
-				System.out.print("Enter your pin code: ");
-				pinCode = scanner.nextLine();
-				if (pinCode.length() != 2) {
-					System.out.println("Please enter a number of length 2");
-					continue;
-				}
-				break;
-			}
-
-			//Gets the confirmation code from the server
-			//Loops again if the credentials are invalid
-			boolean code = sendRequest(createLoginBytes(creditCardNumber, pinCode));
-			if (code)
-				break;
-
-		}
-
-		
-		int menuOption;
-
-		while (true) 
-		{
-			getServerMessage(ServerMessage.GREETING);
-			
-			System.out.print("> ");
-			menuOption = scanner.nextInt();
-			
-			if (menuOption == 1) 
-			{
-				sendRequest(createStatusBytes());
-			}
-			else if(menuOption == 4)
-			{
-				Language[] languages = Language.values();
-				System.out.println("Available languages ");
-			 	
-				for(int i = 0; i < languages.length; i++)
+					adress = args[0];
+				} 
+				catch (ArrayIndexOutOfBoundsException e) 
 				{
-					System.out.println("(" + (i+1) + ") " + languages[i].toString());
+					System.err.println("Missing argument ip-adress");
+					System.exit(1);
 				}
 				
-				System.out.print("Choose your language: ");
-				int selectedLanguage = scanner.nextInt() - 1;
-			 	
-				
-				sendRequest(createLanguageBytes(selectedLanguage));
+				try 
+				{
+					ATMSocket = new Socket(adress, connectionPort);
+					out = new PrintWriter(ATMSocket.getOutputStream(), true);
+					in = new BufferedReader(new InputStreamReader(
+							ATMSocket.getInputStream()));
+				} 
+				catch (UnknownHostException e) 
+				{
+					System.err.println("Unknown host: " + adress);
+					System.exit(1);
+				} 
+				catch (IOException e) 
+				{
+					System.err.println("Couldn't open connection to " + adress);
+					System.exit(1);
+				}
+	
+				//Loop for handling credit card number
+				String creditCardNumber;
+				while (true) 
+				{
+					System.out.print("Enter your credit card number: ");
+					creditCardNumber = scanner.nextLine();
+					if (creditCardNumber.length() != 16) 
+					{
+						getServerMessage(ServerMessage.LOGINFORMATERROR);
+						continue;
+					}
+					break;
+				}
+	
+				//Loop for handling pin code
+				String pinCode;
+				while (true) {
+					System.out.print("Enter your pin code: ");
+					pinCode = scanner.nextLine();
+					if (pinCode.length() != 2) {
+						getServerMessage(ServerMessage.PINFORMATERROR);
+						continue;
+					}
+					break;
+				}
+	
+				//Gets the confirmation code from the server
+				//Loops again if the credentials are invalid
+				boolean code = sendRequest(createLoginBytes(creditCardNumber, pinCode));
+				if (code)
+					break;
+	
 			}
-			else if(menuOption == 3)
+	
+			
+			String menuOption;
+	
+			while (true) 
 			{
-				System.out.print("Enter amount: ");
-				int depositAmount = scanner.nextInt();
-				System.out.println();
+				getServerMessage(ServerMessage.GREETING);
 				
-				System.out.print("Enter code: ");
-				int safetyCode = scanner.nextInt();
-				System.out.println();
+				while(true)
+				{
+					System.out.print("> ");
+					menuOption = scanner.nextLine();
+					if(!menuOption.matches("[0-9]?") || menuOption.equals("") || menuOption == null)
+					{
+						getServerMessage(ServerMessage.INVALIDINPUT);
+						continue;
+					}
+					break;
+				}
 				
-								
-				sendRequest(createDepositBytes(String.valueOf(depositAmount), String.valueOf(safetyCode)));
-
+				if (menuOption.equals("1")) 
+				{
+					sendRequest(createStatusBytes());
+				}
+				else if(menuOption.equals("2"))
+				{
+					
+					getServerMessage(ServerMessage.ENTERAMOUNT);
+					scanner.nextLine();
+					String withdrawAmount = scanner.nextLine();
+					
+					getServerMessage(ServerMessage.ENTERCODE);
+					int safetyCode = scanner.nextInt();
+					System.out.println();
+					
+									
+					sendRequest(createWithdrawalBytes(String.valueOf(withdrawAmount), String.valueOf(safetyCode)));
+				}
+				else if(menuOption.equals("3"))
+				{
+					getServerMessage(ServerMessage.ENTERAMOUNT);
+					int depositAmount = scanner.nextInt();
+					System.out.println();
+					
+					getServerMessage(ServerMessage.ENTERCODE);
+					int safetyCode = scanner.nextInt();
+					System.out.println();
+					
+									
+					sendRequest(createDepositBytes(String.valueOf(depositAmount), String.valueOf(safetyCode)));
+	
+				}
+				
+				else if(menuOption.equals("4"))
+				{
+					Language[] languages = Language.values();
+					getServerMessage(ServerMessage.AVAILABLELANGUAGES);
+				 	
+					for(int i = 0; i < languages.length; i++)
+					{
+						System.out.println("(" + (i+1) + ") " + languages[i].toString());
+					}
+					
+					getServerMessage(ServerMessage.CHOOSELANGUAGE);
+					int selectedLanguage = scanner.nextInt() - 1;
+				 	
+					
+					sendRequest(createLanguageBytes(selectedLanguage));
+				}
+				//Log out
+				else if(menuOption.equals("5"))
+				{
+					break;
+				}
+				else 
+				{
+					break programloop;
+				}
 			}
-			else if(menuOption == 2)
-			{
-				
-				System.out.print("Enter amount: ");
-				scanner.nextLine();
-				String withdrawAmount = scanner.nextLine();
-				
-				System.out.print("Enter code: ");
-				int safetyCode = scanner.nextInt();
-				System.out.println();
-				
-								
-				sendRequest(createWithdrawalBytes(String.valueOf(withdrawAmount), String.valueOf(safetyCode)));
-			}
-			else 
-			{
-				break;
-			}
+	
+			out.close();
+			in.close();
+			ATMSocket.close();
 		}
-
-		out.close();
-		in.close();
-		ATMSocket.close();
+	
+	in.close();
+	ATMSocket.close();
 	}
 }
