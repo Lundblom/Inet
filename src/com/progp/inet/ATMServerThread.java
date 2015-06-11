@@ -122,7 +122,7 @@ public class ATMServerThread extends Thread {
      * @return The read data
      * @throws IOException
      */
-    public byte[] readBytes() throws IOException {
+    public byte[] readBytes() throws IOException, SocketException {
         
         InputStream in = socket.getInputStream();
         DataInputStream dis = new DataInputStream(in);
@@ -238,9 +238,11 @@ public class ATMServerThread extends Thread {
      * @return Returns false if the credentials are not in the database
      * @throws IOException
      */
-    private boolean validateUser() throws IOException 
+    private boolean validateUser() throws IOException, SocketException
     {
-    	byte[] result = readBytes();
+    	byte[] result;
+
+    	result = readBytes();
     	
     	int paddingBytes = 1;
     	
@@ -448,11 +450,18 @@ public class ATMServerThread extends Thread {
             //If we can't find the use
             if(Debug.ON)
             	System.out.println("Validating User");
-            if(validateUser() == false)
+            try{
+	            if(validateUser() == false)
+	            {
+	            	if(Debug.ON)
+	            		System.out.println("Sending invalid Message");
+	            	sendMessage(ServerMessage.INVALIDLOGIN);
+	            	return;
+	            }
+            }
+            catch(SocketException e)
             {
-            	if(Debug.ON)
-            		System.out.println("Sending invalid Message");
-            	sendMessage(ServerMessage.INVALIDLOGIN);
+            	System.out.println(socket + " closed unexpectedly.");
             	return;
             }
             
@@ -467,7 +476,16 @@ public class ATMServerThread extends Thread {
             mainloop:
             while(true)
             {
-            	byte[] data = readBytes();
+            	byte[] data;
+            	try
+            	{
+            		data = readBytes();
+            	}
+            	catch(SocketException e)
+            	{
+            		System.out.println("Socket " + socket + " closed unexpectedly.");
+            		return;
+            	}
             	
             	byte code = data[0];
             	

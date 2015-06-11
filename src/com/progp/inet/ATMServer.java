@@ -26,7 +26,8 @@ public class ATMServer {
 	
         System.out.println("Bank started listening on port: " + connectionPort);
         while (listening)
-            new ATMServerThread(serverSocket.accept()).start();
+        	new ATMServerThread(serverSocket.accept()).start();
+
 
         serverSocket.close();
     }
