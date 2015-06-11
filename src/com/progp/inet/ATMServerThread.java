@@ -20,7 +20,7 @@ public class ATMServerThread extends Thread {
     private BufferedReader in;
     PrintWriter out;
     
-    final static String DATABASEURL = "jdbc:sqlite:database.db";
+    public final static String DATABASEURL = "jdbc:sqlite:database.db";
     
     private Language currentLanguage = Language.ENGLISH;
     
@@ -37,7 +37,7 @@ public class ATMServerThread extends Thread {
     
     public static final int CREDITCARDLENGTH = 16;
     public static final int PINLENGTH = 2;
-	private static final int TIMEOUT = 5;
+	public static final int TIMEOUT = 5;
 	
 	private static String userCreditCard = "";
 	private static String userPinCode = "";
@@ -492,7 +492,8 @@ public class ATMServerThread extends Thread {
             	}
             	catch(SocketException e)
             	{
-            		System.out.println("Socket " + socket + " closed unexpectedly.");
+            		if(Debug.ON)
+            			System.out.println("Socket " + socket + " closed unexpectedly.");
             		return;
             	}
             	if(data == null)
