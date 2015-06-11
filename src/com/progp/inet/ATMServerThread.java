@@ -393,6 +393,8 @@ public class ATMServerThread extends Thread {
     	
     	String updateQuery = "UPDATE User SET balance=" + (balance+depositAmount) + " WHERE creditCardNumber=" + userCreditCard + " AND pinCode=" + userPinCode;
     	
+    	sendCode(0);
+    	sendMessage(ServerMessage.DEPOSITSUCCESS);
     	updateDatabase(updateQuery);
     }
 
